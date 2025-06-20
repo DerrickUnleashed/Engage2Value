@@ -1,5 +1,1 @@
 venv
-tfidf_encoders.pkl
-catboost_info
-best_xgb_model.pkl
-best_xgb_random_search.pkl
