@@ -244,9 +244,9 @@ def train_models(train_data, n_iterations=10):
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import r2_score
     
-    # Prepare features and targets
+    # Prepare features and targets - EXCLUDE purchaseValue to prevent leakage
     feature_cols = [col for col in train_data.columns 
-                   if col not in ['userId', 'target', 'returned', 'actual_purchase']]
+                   if col not in ['userId', 'target', 'returned', 'actual_purchase', 'purchaseValue_sum', 'purchaseValue']]
     
     X = train_data[feature_cols].values
     y_classification = train_data['returned'].values
@@ -464,12 +464,16 @@ def main():
         print("Warning: Very few users with purchases. Switching to direct regression...")
         return direct_regression_approach(train_encoded, test_encoded)
     
-    # Validation split for R² evaluation
-    from sklearn.model_selection import train_test_split
-    train_for_model, val_for_eval = train_test_split(
-        train_encoded, test_size=0.2, random_state=42, 
-        stratify=train_encoded['returned'] if train_encoded['returned'].nunique() > 1 else None
-    )
+    # Validation split for R² evaluation - ensure no user overlap
+    unique_users = train_encoded['userId'].unique()
+    np.random.seed(42)
+    np.random.shuffle(unique_users)
+    
+    val_users = unique_users[:int(len(unique_users) * 0.2)]
+    train_users = unique_users[int(len(unique_users) * 0.2):]
+    
+    train_for_model = train_encoded[train_encoded['userId'].isin(train_users)]
+    val_for_eval = train_encoded[train_encoded['userId'].isin(val_users)]
     
     # Train models
     print("Training models...")
@@ -549,9 +553,9 @@ def direct_regression_approach(train_data, test_data):
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.model_selection import train_test_split
     
-    # Prepare features
+    # Prepare features - EXCLUDE purchaseValue to prevent leakage
     feature_cols = [col for col in train_data.columns 
-                   if col not in ['userId', 'target', 'returned', 'actual_purchase']]
+                   if col not in ['userId', 'target', 'returned', 'actual_purchase', 'purchaseValue_sum', 'purchaseValue']]
     
     X = train_data[feature_cols].fillna(0)
     y = train_data['target'].fillna(0)
